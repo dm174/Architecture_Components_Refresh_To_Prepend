@@ -55,30 +55,43 @@ class PostRemoteMediator(
 
             db.withTransaction {
                 when (loadType) {
-                    LoadType.REFRESH -> {
-                        if (body.isEmpty()) {
-                            // База данных пуста, записываем ключ BEFORE
-                            val lastItemId = body.lastOrNull()?.id
-                            if (lastItemId != null) {
-                                postRemoteKeyDao.insert(
-                                    listOf(PostRemoteKeyEntity(
-                                        type = PostRemoteKeyEntity.KeyType.BEFORE,
-                                        id = lastItemId
-                                    ))
-                                )
-                            }
-                        } else {
-                            // База данных не пуста, не записываем ключ BEFORE
-                            val firstItemId = body.firstOrNull()?.id
-                            if (firstItemId != null) {
-                                postRemoteKeyDao.insert(
-                                    listOf(PostRemoteKeyEntity(
-                                        type = PostRemoteKeyEntity.KeyType.AFTER,
-                                        id = firstItemId
-                                    ))
-                                )
-                            }
-                        }
+                    if (body.isEmpty()) return MediatorResult.Success(true)
+
+db.withTransaction {
+    when (loadType) {
+        LoadType.REFRESH -> {
+            // При REFRESH ключ AFTER всегда перезаписывается
+            val firstItemId = body.firstOrNull()?.id
+            if (firstItemId != null) {
+                postRemoteKeyDao.insert(
+                    listOf(PostRemoteKeyEntity(
+                        type = PostRemoteKeyEntity.KeyType.AFTER,
+                        id = firstItemId
+                    ))
+                )
+            }
+
+            // Проверяем, пуста ли база данных
+            val existingKeys = postRemoteKeyDao.getAll()
+            if (existingKeys.isEmpty()) {
+                // База данных пуста, записываем ключ BEFORE
+                val lastItemId = body.lastOrNull()?.id
+                if (lastItemId != null) {
+                    postRemoteKeyDao.insert(
+                        listOf(PostRemoteKeyEntity(
+                            type = PostRemoteKeyEntity.KeyType.BEFORE,
+                            id = lastItemId
+                        ))
+                    )
+                }
+            }
+        }
+        // Другие варианты обработки loadType
+    }
+}
+
+return MediatorResult.Success(true)
+
                     }
 
                     LoadType.PREPEND -> {
