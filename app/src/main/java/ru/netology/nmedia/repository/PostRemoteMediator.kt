@@ -32,11 +32,6 @@ class PostRemoteMediator(
                         service.getAfter(id, state.config.pageSize)
                     } ?: service.getLatest(state.config.pageSize)
                 LoadType.PREPEND -> {
-//                    Код с лекции
-//                    val id = postRemoteKeyDao.max() ?: return MediatorResult.Success(
-//                        endOfPaginationReached = false
-//                    )
-//                    service.getAfter(id, state.config.pageSize)
                     return MediatorResult.Success(true)
                 }
                 LoadType.APPEND -> {
@@ -53,62 +48,39 @@ class PostRemoteMediator(
                 response.message(),
             )
 
+            if (body.isEmpty()) {
+                return MediatorResult.Success(true)
+            }
+
             db.withTransaction {
                 when (loadType) {
-                    if (body.isEmpty()) return MediatorResult.Success(true)
-
-db.withTransaction {
-    when (loadType) {
-        LoadType.REFRESH -> {
-            // При REFRESH ключ AFTER всегда перезаписывается
-            val firstItemId = body.firstOrNull()?.id
-            if (firstItemId != null) {
-                postRemoteKeyDao.insert(
-                    listOf(PostRemoteKeyEntity(
-                        type = PostRemoteKeyEntity.KeyType.AFTER,
-                        id = firstItemId
-                    ))
-                )
-            }
-
-            // Проверяем, пуста ли база данных
-            val existingKeys = postRemoteKeyDao.getAll()
-            if (existingKeys.isEmpty()) {
-                // База данных пуста, записываем ключ BEFORE
-                val lastItemId = body.lastOrNull()?.id
-                if (lastItemId != null) {
-                    postRemoteKeyDao.insert(
-                        listOf(PostRemoteKeyEntity(
-                            type = PostRemoteKeyEntity.KeyType.BEFORE,
-                            id = lastItemId
-                        ))
-                    )
-                }
-            }
-        }
-        // Другие варианты обработки loadType
-    }
-}
-
-return MediatorResult.Success(true)
-
+                    LoadType.REFRESH -> {
+                        // Всегда перезаписываем ключ AFTER при REFRESH
+                        val firstItemId = body.firstOrNull()?.id
+                        if (firstItemId != null) {
+                            postRemoteKeyDao.insert(
+                                listOf(PostRemoteKeyEntity(
+                                    type = PostRemoteKeyEntity.KeyType.AFTER,
+                                    id = firstItemId
+                                ))
+                            )
+                        }
                     }
 
                     LoadType.PREPEND -> {
-//                        postRemoteKeyDao.insert(
-//                            PostRemoteKeyEntity(
-//                                type = PostRemoteKeyEntity.KeyType.AFTER,
-//                                id = body.first().id,
-//                            )
-//                        )
+                        // Ничего не делаем в случае PREPEND
                     }
+
                     LoadType.APPEND -> {
-                        postRemoteKeyDao.insert(
-                            PostRemoteKeyEntity(
-                                type = PostRemoteKeyEntity.KeyType.BEFORE,
-                                id = body.last().id,
+                        val lastItemId = body.lastOrNull()?.id
+                        if (lastItemId != null) {
+                            postRemoteKeyDao.insert(
+                                listOf(PostRemoteKeyEntity(
+                                    type = PostRemoteKeyEntity.KeyType.BEFORE,
+                                    id = lastItemId
+                                ))
                             )
-                        )
+                        }
                     }
                 }
                 postDao.insert(body.toEntity())
@@ -118,4 +90,5 @@ return MediatorResult.Success(true)
             return MediatorResult.Error(e)
         }
     }
+
 }
